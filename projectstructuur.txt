@@ -1,0 +1,23 @@
+autoedge/
+├── .env                  ← jouw wachtwoorden (nooit op GitHub)
+├── .env.example          ← template zonder wachtwoorden (wel op GitHub)
+├── .gitignore
+├── requirements.txt
+│
+├── db.py                 ← database-connectie (schrijven we als stap 2)
+├── scoring.py            ← deal-score algoritme (schrijven we als stap 3)
+│
+├── alerts/
+│   ├── matcher.py        ← vergelijkt listings met alerts
+│   └── notifier.py       ← verstuurt Telegram + e-mail
+│
+├── app.py                ← Streamlit dashboard
+│
+├── scraper/              ← komt later, na platform-overleg
+│   └── tweedehands.py
+│
+├── sql/
+│   └── schema.sql        ← database-tabellen (schrijven we als stap 2)
+│
+└── tests/
+    └── test_scoring.py   ← automatische tests
