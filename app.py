@@ -7,6 +7,8 @@ Opstarten met: streamlit run app.py
 import streamlit as st
 import pandas as pd
 import db
+from invoer import toon_invoer_pagina
+from ai_chat import toon_ai_pagina
 
 # ─── PAGINA-INSTELLINGEN ─────────────────────────────────────────────────────
 
@@ -98,6 +100,15 @@ with col_titel:
     st.markdown("## AutoEdge")
     st.caption("TradingView voor Belgische occasiewagens")
 
+pagina = st.sidebar.radio("Navigatie", ["🏠 Dashboard", "➕ Invoer", "🤖 AI Assistent"])
+
+if pagina == "➕ Invoer":
+    toon_invoer_pagina()
+    st.stop()
+
+if pagina == "🤖 AI Assistent":
+    toon_ai_pagina()
+    st.stop()
 st.divider()
 
 # ─── DATA LADEN ──────────────────────────────────────────────────────────────
@@ -232,6 +243,7 @@ if st.session_state.geselecteerd_id:
         st.metric("Marktwaarde", f"€{marktwaarde:,.0f}")
         kleur_delta = "normal" if afwijking >= 0 else "inverse"
         st.metric(
+
             "Verschil met markt",
             f"€{abs(marktwaarde - prijs):,.0f}",
             delta=f"{afwijking:.1f}%",

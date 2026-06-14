@@ -5,11 +5,6 @@ Deal-score algoritme. Berekent marktwaarde, deal-score en risicovlaggen.
 
 import db
 
-# ─── MARKTWAARDE PARAMETERS ─────────────────────────────────────────────────
-# km_penalty = euro per km aftrek van de basiswaarde
-# Voorbeeld: Golf basis €18.500, penalty €0.09/km
-#   → 88.000 km × €0.09 = €7.920 aftrek → marktwaarde ≈ €10.580
-
 MARKTWAARDES = {
     "vw golf":       {"basis": 18500, "km_penalty": 0.09,  "jaar_bonus": 400},
     "bmw 3":         {"basis": 22000, "km_penalty": 0.11,  "jaar_bonus": 500},
@@ -31,37 +26,32 @@ def _clamp(waarde, minimum, maximum):
     return max(minimum, min(maximum, waarde))
 
 
-def _zoek_marktwaarde_params(merk: str, model: str) -> dict:
+def _zoek_marktwaarde_params(merk, model):
     merk_lower  = merk.lower().strip()
     model_lower = model.lower().strip()
     sleutel     = f"{merk_lower} {model_lower}"
-
     if sleutel in MARKTWAARDES:
         return MARKTWAARDES[sleutel]
-
     for naam, params in MARKTWAARDES.items():
         if model_lower in naam.split():
             return params
-
     for naam, params in MARKTWAARDES.items():
         if merk_lower in naam.split():
             return params
-
     gemiddelde_basis = sum(p["basis"] for p in MARKTWAARDES.values()) / len(MARKTWAARDES)
     return {"basis": gemiddelde_basis, "km_penalty": 0.085, "jaar_bonus": 380}
 
 
-def bereken_marktwaarde(merk: str, model: str, bouwjaar: int, km: int) -> float:
-    """Schat de marktwaarde op basis van merk, model, bouwjaar en km."""
+def bereken_marktwaarde(merk, model, bouwjaar, km):
     params         = _zoek_marktwaarde_params(merk, model)
     jaar_correctie = (bouwjaar - BASIS_JAAR) * params["jaar_bonus"]
-    km_correctie   = km * params["km_penalty"]          # euro per km, geen * basis
+    km_correctie   = km * params["km_penalty"]
     marktwaarde    = params["basis"] + jaar_correctie - km_correctie
     minimum        = params["basis"] * 0.10
     return round(max(marktwaarde, minimum), 2)
 
 
-def _score_prijs(prijs: float, marktwaarde: float) -> int:
+def _score_prijs(prijs, marktwaarde):
     if marktwaarde <= 0:
         return 0
     afwijking = (marktwaarde - prijs) / marktwaarde
@@ -69,7 +59,7 @@ def _score_prijs(prijs: float, marktwaarde: float) -> int:
     return int(_clamp(round(score), 0, 40))
 
 
-def _score_km(km: int, bouwjaar: int) -> int:
+def _score_km(km, bouwjaar):
     huidig_jaar  = 2025
     verwachte_km = (huidig_jaar - bouwjaar) * VERWACHTE_KM_PER_JAAR
     if verwachte_km <= 0:
@@ -79,11 +69,11 @@ def _score_km(km: int, bouwjaar: int) -> int:
     return int(_clamp(round(score), 0, 25))
 
 
-def _score_staat(beschrijving: str):
+def _score_staat(beschrijving):
     tekst = beschrijving.lower() if beschrijving else ""
     positief = ["onderhouden", "nieuwstaat", "garagewagen", "1 eigenaar",
-                 "één eigenaar", "geen schade", "volledig", "dealer",
-                 "recent", "gekeurd", "carpass"]
+                "één eigenaar", "geen schade", "volledig", "dealer",
+                "recent", "gekeurd", "carpass"]
     negatief = ["schade", "ongeval", "roest", "motorproblemen",
                 "olieverlies", "as is", "zelf te herstellen", "defect", "probleem"]
     netto = sum(1 for w in positief if w in tekst) - sum(1 for w in negatief if w in tekst)
@@ -93,7 +83,7 @@ def _score_staat(beschrijving: str):
     else:            return 5,  "slecht"
 
 
-def _score_urgentie(dagen_online: int) -> int:
+def _score_urgentie(dagen_online):
     if dagen_online <= 0:    return 10
     elif dagen_online <= 14: return 15
     elif dagen_online <= 45: return 8
@@ -119,12 +109,12 @@ def detecteer_risicovlaggen(prijs, marktwaarde, km, bouwjaar, dagen_online, staa
     return vlaggen
 
 
-def bereken_winst_potentieel(prijs: float, marktwaarde: float) -> float:
+def bereken_winst_potentieel(prijs, marktwaarde):
     winst = (marktwaarde - prijs) * 0.70 - 500
     return round(winst, 2)
 
 
-def deal_score(advertentie: dict) -> dict:
+def deal_score(advertentie):
     merk         = advertentie.get("merk", "")
     model        = advertentie.get("model", "")
     bouwjaar     = int(advertentie.get("bouwjaar", 2015))
@@ -133,7 +123,17 @@ def deal_score(advertentie: dict) -> dict:
     beschrijving = advertentie.get("beschrijving", "")
     dagen_online = int(advertentie.get("dagen_online", 7))
 
-    marktwaarde          = bereken_marktwaarde(merk, model, bouwjaar, km)
+    # Marktwaarde: eerst database, dan algoritme als fallback
+    try:
+        from marktprijzen import zoek_marktprijs
+        db_markt = zoek_marktprijs(merk, model, bouwjaar, km)
+        if db_markt and db_markt["aantal_samples"] >= 3:
+            marktwaarde = float(db_markt["mediaan_prijs"])
+        else:
+            marktwaarde = bereken_marktwaarde(merk, model, bouwjaar, km)
+    except Exception:
+        marktwaarde = bereken_marktwaarde(merk, model, bouwjaar, km)
+
     s_prijs              = _score_prijs(prijs, marktwaarde)
     s_km                 = _score_km(km, bouwjaar)
     s_staat, staat_label = _score_staat(beschrijving)
@@ -165,7 +165,7 @@ def deal_score(advertentie: dict) -> dict:
     }
 
 
-def sla_score_op(listing_id: str, score: dict):
+def sla_score_op(listing_id, score):
     db.execute("""
         INSERT INTO scores (
             listing_id, deal_score, marktwaarde, prijs_afwijking_pct,
@@ -192,15 +192,9 @@ def sla_score_op(listing_id: str, score: dict):
 
 
 if __name__ == "__main__":
-    tests = [
-        {"merk": "VW",      "model": "Golf",  "bouwjaar": 2017, "km": 88000,  "prijs": 13900},
-        {"merk": "Renault", "model": "Clio",  "bouwjaar": 2020, "km": 41000,  "prijs": 13500},
-        {"merk": "BMW",     "model": "3",     "bouwjaar": 2018, "km": 110000, "prijs": 19500},
-        {"merk": "Toyota",  "model": "Yaris", "bouwjaar": 2019, "km": 62000,  "prijs": 14200},
-    ]
-    print("\n── Marktwaarde check ───────────────────────────────")
-    for t in tests:
-        mv = bereken_marktwaarde(t["merk"], t["model"], t["bouwjaar"], t["km"])
-        print(f"  {t['merk']:10} {t['model']:10} ({t['bouwjaar']})  "
-              f"{t['km']:>7,} km  →  marktwaarde: €{mv:>8,.0f}")
-    print()
+    test = {"merk": "VW", "model": "Golf", "bouwjaar": 2017, "km": 88000, "prijs": 13900,
+            "beschrijving": "Garagewagen, volledig onderhouden, geen schade.", "dagen_online": 3}
+    r = deal_score(test)
+    print(f"VW Golf 2017 — €13.900")
+    print(f"Marktwaarde: €{r['marktwaarde']:,.0f}")
+    print(f"Score: {r['deal_score']}/100 — {r['verdict']}")
