@@ -104,7 +104,9 @@ def score_verdict(score):
 
 # ─── HEADER ──────────────────────────────────────────────────────────────────
 
-st.image("logo.svg", width=280)
+with open("logo.svg", "r") as f:
+    svg = f.read()
+st.markdown(f'<div style="margin-bottom:1rem">{svg}</div>', unsafe_allow_html=True)
 
 pagina = st.sidebar.radio("Navigatie", [
     "🏠 Dashboard",
