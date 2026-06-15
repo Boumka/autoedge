@@ -19,3 +19,4 @@ langchain-core
 langchain-community
 langchain-anthropic
 supabase
+google-genai
