@@ -6,16 +6,16 @@ Deal-score algoritme. Berekent marktwaarde, deal-score en risicovlaggen.
 import db
 
 MARKTWAARDES = {
-    "vw golf":       {"basis": 18500, "km_penalty": 0.09,  "jaar_bonus": 400},
-    "bmw 3":         {"basis": 22000, "km_penalty": 0.11,  "jaar_bonus": 500},
-    "opel astra":    {"basis": 14000, "km_penalty": 0.08,  "jaar_bonus": 350},
-    "ford focus":    {"basis": 13500, "km_penalty": 0.08,  "jaar_bonus": 350},
-    "toyota yaris":  {"basis": 15000, "km_penalty": 0.085, "jaar_bonus": 380},
-    "renault clio":  {"basis": 13000, "km_penalty": 0.075, "jaar_bonus": 330},
-    "peugeot 208":   {"basis": 14500, "km_penalty": 0.08,  "jaar_bonus": 360},
-    "audi a3":       {"basis": 20000, "km_penalty": 0.10,  "jaar_bonus": 450},
-    "mercedes c":    {"basis": 23000, "km_penalty": 0.115, "jaar_bonus": 520},
-    "skoda octavia": {"basis": 16000, "km_penalty": 0.085, "jaar_bonus": 380},
+    "vw golf":       {"basis": 18500, "km_penalty": 0.045, "jaar_bonus": 400},
+    "bmw 3":         {"basis": 22000, "km_penalty": 0.055, "jaar_bonus": 500},
+    "opel astra":    {"basis": 14000, "km_penalty": 0.040, "jaar_bonus": 350},
+    "ford focus":    {"basis": 13500, "km_penalty": 0.040, "jaar_bonus": 350},
+    "toyota yaris":  {"basis": 15000, "km_penalty": 0.042, "jaar_bonus": 380},
+    "renault clio":  {"basis": 13000, "km_penalty": 0.038, "jaar_bonus": 330},
+    "peugeot 208":   {"basis": 14500, "km_penalty": 0.040, "jaar_bonus": 360},
+    "audi a3":       {"basis": 20000, "km_penalty": 0.050, "jaar_bonus": 450},
+    "mercedes c":    {"basis": 23000, "km_penalty": 0.055, "jaar_bonus": 520},
+    "skoda octavia": {"basis": 16000, "km_penalty": 0.042, "jaar_bonus": 380},
 }
 
 BASIS_JAAR = 2017
@@ -39,10 +39,11 @@ def _zoek_marktwaarde_params(merk, model):
         if merk_lower in naam.split():
             return params
     gemiddelde_basis = sum(p["basis"] for p in MARKTWAARDES.values()) / len(MARKTWAARDES)
-    return {"basis": gemiddelde_basis, "km_penalty": 0.085, "jaar_bonus": 380}
+    return {"basis": gemiddelde_basis, "km_penalty": 0.042, "jaar_bonus": 380}
 
 
 def bereken_marktwaarde(merk, model, bouwjaar, km):
+    """Schat de marktwaarde op basis van merk, model, bouwjaar en km."""
     params         = _zoek_marktwaarde_params(merk, model)
     jaar_correctie = (bouwjaar - BASIS_JAAR) * params["jaar_bonus"]
     km_correctie   = km * params["km_penalty"]
@@ -72,7 +73,7 @@ def _score_km(km, bouwjaar):
 def _score_staat(beschrijving):
     tekst = beschrijving.lower() if beschrijving else ""
     positief = ["onderhouden", "nieuwstaat", "garagewagen", "1 eigenaar",
-                "één eigenaar", "geen schade", "volledig", "dealer",
+                "een eigenaar", "geen schade", "volledig", "dealer",
                 "recent", "gekeurd", "carpass"]
     negatief = ["schade", "ongeval", "roest", "motorproblemen",
                 "olieverlies", "as is", "zelf te herstellen", "defect", "probleem"]
@@ -94,18 +95,18 @@ def _score_urgentie(dagen_online):
 def detecteer_risicovlaggen(prijs, marktwaarde, km, bouwjaar, dagen_online, staat, beschrijving):
     vlaggen = []
     afwijking_pct = (marktwaarde - prijs) / marktwaarde * 100 if marktwaarde > 0 else 0
-    if km > 200000:           vlaggen.append("⚠️ Zeer hoog km-stand (>200k)")
-    elif km > 150000:         vlaggen.append("⚠️ Hoog km-stand (>150k)")
-    if dagen_online > 90:     vlaggen.append("⚠️ Zeer lang online (>90 dagen)")
-    elif dagen_online > 60:   vlaggen.append("⚠️ Lang online (>60 dagen)")
-    if afwijking_pct < -10:   vlaggen.append("⚠️ Prijs boven marktwaarde")
-    if staat == "slecht":     vlaggen.append("⚠️ Negatieve signalen in beschrijving")
-    if 2025 - bouwjaar > 12:  vlaggen.append("⚠️ Oudere wagen (>12 jaar)")
-    if afwijking_pct > 15:    vlaggen.append("✅ Sterk ondergewaardeerd (>15% onder markt)")
-    elif afwijking_pct > 8:   vlaggen.append("✅ Ondergewaardeerd (>8% onder markt)")
-    if dagen_online <= 1:     vlaggen.append("✅ Vers online — reageer snel")
-    if staat == "uitstekend": vlaggen.append("✅ Uitstekende staat vermeld")
-    if not vlaggen:           vlaggen.append("✅ Geen opvallende risico's")
+    if km > 200000:           vlaggen.append("Zeer hoog km-stand (>200k)")
+    elif km > 150000:         vlaggen.append("Hoog km-stand (>150k)")
+    if dagen_online > 90:     vlaggen.append("Zeer lang online (>90 dagen)")
+    elif dagen_online > 60:   vlaggen.append("Lang online (>60 dagen)")
+    if afwijking_pct < -10:   vlaggen.append("Prijs boven marktwaarde")
+    if staat == "slecht":     vlaggen.append("Negatieve signalen in beschrijving")
+    if 2025 - bouwjaar > 12:  vlaggen.append("Oudere wagen (>12 jaar)")
+    if afwijking_pct > 15:    vlaggen.append("Sterk ondergewaardeerd (>15% onder markt)")
+    elif afwijking_pct > 8:   vlaggen.append("Ondergewaardeerd (>8% onder markt)")
+    if dagen_online <= 1:     vlaggen.append("Vers online - reageer snel")
+    if staat == "uitstekend": vlaggen.append("Uitstekende staat vermeld")
+    if not vlaggen:           vlaggen.append("Geen opvallende risicos")
     return vlaggen
 
 
@@ -192,9 +193,14 @@ def sla_score_op(listing_id, score):
 
 
 if __name__ == "__main__":
-    test = {"merk": "VW", "model": "Golf", "bouwjaar": 2017, "km": 88000, "prijs": 13900,
-            "beschrijving": "Garagewagen, volledig onderhouden, geen schade.", "dagen_online": 3}
-    r = deal_score(test)
-    print(f"VW Golf 2017 — €13.900")
-    print(f"Marktwaarde: €{r['marktwaarde']:,.0f}")
-    print(f"Score: {r['deal_score']}/100 — {r['verdict']}")
+    tests = [
+        {"merk": "Skoda", "model": "Octavia", "bouwjaar": 2016, "km": 165300, "prijs": 6950},
+        {"merk": "VW",    "model": "Golf",    "bouwjaar": 2017, "km": 88000,  "prijs": 13900},
+        {"merk": "BMW",   "model": "3",       "bouwjaar": 2018, "km": 110000, "prijs": 19500},
+    ]
+    print("\n── Marktwaarde check ───────────────────────────────")
+    for t in tests:
+        mv = bereken_marktwaarde(t["merk"], t["model"], t["bouwjaar"], t["km"])
+        print(f"  {t['merk']:10} {t['model']:10} ({t['bouwjaar']})  "
+              f"{t['km']:>7,} km  →  marktwaarde: EUR{mv:>8,.0f}")
+    print()

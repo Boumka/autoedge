@@ -31,24 +31,45 @@ HEADERS = {
 
 # Standaard zoekopdrachten — pas aan naar wens
 STANDAARD_ZOEKOPDRACHTEN = [
-    {"query": "VW Golf",      "limit": 30},
-    {"query": "BMW 3",        "limit": 30},
-    {"query": "Toyota Yaris", "limit": 30},
-    {"query": "Opel Astra",   "limit": 30},
-    {"query": "Renault Clio", "limit": 30},
+    {"query": "VW Golf",      "limit": 30, "categorie": 91},
+    {"query": "BMW 3",        "limit": 30, "categorie": 91},
+    {"query": "Toyota Yaris", "limit": 30, "categorie": 91},
+    {"query": "Opel Astra",   "limit": 30, "categorie": 91},
+    {"query": "Renault Clio", "limit": 30, "categorie": 91},
+    {"query": "camionette",   "limit": 30, "categorie": 93},
+    {"query": "moto",         "limit": 30, "categorie": 95},
+    {"query": "Ford Transit",      "limit": 30, "categorie": 93},
+    {"query": "Volkswagen Crafter", "limit": 30, "categorie": 93},
+    {"query": "Mercedes Sprinter", "limit": 30, "categorie": 93},
+    {"query": "Renault Master",    "limit": 30, "categorie": 93},
+    {"query": "Peugeot Boxer",     "limit": 30, "categorie": 93},
+    {"query": "Iveco Daily",       "limit": 30, "categorie": 93},
+    {"query": "Honda CBR",         "limit": 30, "categorie": 95},
+    {"query": "Yamaha MT",         "limit": 30, "categorie": 95},
+    {"query": "BMW GS",            "limit": 30, "categorie": 95},
 ]
 
+
 # Categorie 91 = Auto's op 2dehands.be
-CATEGORIE_AUTO = 91
+CATEGORIE_AUTO = 91  # Personenwagens (standaard)
+
+ALLE_CATEGORIEEN = {
+    91:  "Personenwagens",
+    93:  "Camionettes",
+    94:  "Vrachtwagens", 
+    95:  "Motorfietsen",
+    97:  "Caravans",
+    98:  "Boten",
+}
 
 
 # ─── API AANROEPEN ───────────────────────────────────────────────────────────
 
-def zoek_advertenties(query: str, limit: int = 30, offset: int = 0) -> list:
+def zoek_advertenties(query: str, limit: int = 30, offset: int = 0, categorie: int = 91) -> list:
     """Haalt advertenties op van 2dehands.be voor een zoekopdracht."""
     params = {
         "attributesByKey[]":      "Language:all-languages",
-        "l1CategoryId":           CATEGORIE_AUTO,
+        "l1CategoryId":           categorie,
         "limit":                  limit,
         "offset":                 offset,
         "query":                  query,
@@ -82,11 +103,8 @@ def extraheer_attribuut(listing: dict, key: str) -> str | None:
     return None
 
 
-def extraheer_km(listing: dict) -> int | None:
-    """Extraheert de kilometerstand uit de titel of beschrijving."""
-    tekst = f"{listing.get('title', '')} {listing.get('description', '')}"
-
-    # Zoek patronen zoals "150000 km", "150.000 km", "150 000 km"
+def extraheer_km_uit_tekst(tekst: str) -> int | None:
+    """Extraheert km-stand uit een tekst via regex."""
     patronen = [
         r'(\d{1,3}[\.\s]?\d{3})\s*km',
         r'(\d{4,6})\s*km',
@@ -96,9 +114,33 @@ def extraheer_km(listing: dict) -> int | None:
         if match:
             km_str = match.group(1).replace(".", "").replace(" ", "")
             km = int(km_str)
-            if 0 < km < 500000:
+            if 1000 < km < 500000:
                 return km
     return None
+
+
+def extraheer_km(listing: dict) -> int | None:
+    """
+    Extraheert de kilometerstand slim:
+    1. Eerst uit de beschrijving (meest betrouwbaar)
+    2. Dan uit de titel
+    3. Vergelijkt beide — kiest de meest realistische waarde
+    """
+    titel       = listing.get("title", "")
+    beschrijving = listing.get("description", "")
+
+    km_beschrijving = extraheer_km_uit_tekst(beschrijving)
+    km_titel        = extraheer_km_uit_tekst(titel)
+
+    # Als beide beschikbaar: kies de waarde uit de beschrijving
+    # want die bevat vaak de correcte info
+    if km_beschrijving and km_titel:
+        # Als ze sterk verschillen (>50%), gebruik beschrijving
+        if km_titel > 0 and abs(km_beschrijving - km_titel) / km_titel > 0.5:
+            return km_beschrijving
+        return km_beschrijving
+
+    return km_beschrijving or km_titel
 
 
 def extraheer_bouwjaar(listing: dict) -> int | None:
@@ -172,7 +214,8 @@ def verwerk_listing(listing: dict, query: str) -> dict | None:
                      for url in foto_urls[:5]]
 
         # URL
-        url = f"https://www.2dehands.be/a/{item_id}.html"
+        vip_url = listing.get("vipUrl", "")
+        url = f"https://www.2dehands.be{vip_url}" if vip_url else f"https://www.2dehands.be/v/{item_id}"
 
         return {
             "external_id":  item_id,
@@ -247,7 +290,7 @@ def run_scraper(zoekopdrachten: list = None, verbose: bool = True):
 
         print(f"  🔍 '{query}' (max {limit} resultaten)")
 
-        listings = zoek_advertenties(query, limit=limit)
+        listings = zoek_advertenties(query, limit=limit, categorie=opdracht.get("categorie", 91))
         nieuw = 0
 
         for raw in listings:

@@ -1,0 +1,36 @@
+<svg width="300" height="72" viewBox="0 0 300 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+  
+  <!-- Icoon achtergrond - lichter paars -->
+  <rect x="0" y="8" width="56" height="56" rx="12" fill="#6C63D4"/>
+  
+  <!-- Auto body - volledig wit, dik -->
+  <path d="M14 39 L18 28 L24 23 L36 23 L42 28 L46 39" 
+        stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="white" fill-opacity="0.9"/>
+  
+  <!-- Onderkant auto -->
+  <rect x="11" y="37" width="37" height="5" rx="2" fill="white"/>
+  
+  <!-- Raam -->
+  <path d="M20 34 L23 26 L35 26 L38 34 Z" fill="#6C63D4"/>
+  
+  <!-- Wielen -->
+  <circle cx="19" cy="43" r="5" fill="white"/>
+  <circle cx="19" cy="43" r="2.5" fill="#6C63D4"/>
+  <circle cx="39" cy="43" r="5" fill="white"/>
+  <circle cx="39" cy="43" r="2.5" fill="#6C63D4"/>
+  
+  <!-- Graph lijn onderaan -->
+  <polyline points="6,54 14,50 22,52 30,46 38,48 50,42" 
+            stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" 
+            fill="none" opacity="0.6"/>
+  
+  <!-- Tekst: Auto -->
+  <text x="68" y="40" font-family="Arial, sans-serif" font-size="30" font-weight="800" fill="#534AB7">Auto</text>
+  
+  <!-- Tekst: Edge -->
+  <text x="137" y="40" font-family="Arial, sans-serif" font-size="30" font-weight="800" fill="#6C63D4">Edge</text>
+  
+  <!-- Tagline -->
+  <text x="68" y="57" font-family="Arial, sans-serif" font-size="11" fill="#999999" letter-spacing="0.5">TradingView voor occasiewagens</text>
+
+</svg>

@@ -7,8 +7,11 @@ Opstarten met: streamlit run app.py
 import streamlit as st
 import pandas as pd
 import db
+from langchain_chat import toon_langchain_pagina
+from foto_analyse import toon_foto_pagina
 from invoer import toon_invoer_pagina
 from ai_chat import toon_ai_pagina
+from login import toon_login_pagina, check_sessie, uitloggen, check_url_token
 
 # ─── PAGINA-INSTELLINGEN ─────────────────────────────────────────────────────
 
@@ -17,6 +20,14 @@ st.set_page_config(
     page_icon="🚗",
     layout="wide",
 )
+
+# ─── LOGIN CHECK ─────────────────────────────────────────────────────────────
+
+check_url_token()
+gebruiker = check_sessie()
+if not gebruiker:
+    toon_login_pagina()
+    st.stop()
 
 # ─── STIJL ───────────────────────────────────────────────────────────────────
 
@@ -93,14 +104,15 @@ def score_verdict(score):
 
 # ─── HEADER ──────────────────────────────────────────────────────────────────
 
-col_logo, col_titel = st.columns([1, 8])
-with col_logo:
-    st.markdown("## 🚗")
-with col_titel:
-    st.markdown("## AutoEdge")
-    st.caption("TradingView voor Belgische occasiewagens")
+st.image("logo.svg", width=280)
 
-pagina = st.sidebar.radio("Navigatie", ["🏠 Dashboard", "➕ Invoer", "🤖 AI Assistent"])
+pagina = st.sidebar.radio("Navigatie", [
+    "🏠 Dashboard",
+    "➕ Invoer",
+    "🤖 AI Assistent",
+    "📸 Foto-analyse",
+    "🧠 AI Advisor"
+])
 
 if pagina == "➕ Invoer":
     toon_invoer_pagina()
@@ -109,6 +121,15 @@ if pagina == "➕ Invoer":
 if pagina == "🤖 AI Assistent":
     toon_ai_pagina()
     st.stop()
+
+if pagina == "📸 Foto-analyse":
+    toon_foto_pagina()
+    st.stop()
+
+if pagina == "🧠 AI Advisor":
+    toon_langchain_pagina()
+    st.stop()
+
 st.divider()
 
 # ─── DATA LADEN ──────────────────────────────────────────────────────────────
@@ -150,6 +171,10 @@ with st.sidebar:
 
     st.divider()
     st.caption(f"📊 {len(df)} advertenties in database")
+    st.divider()
+    st.caption(f"👤 {gebruiker.email}")
+    if st.button("Uitloggen"):
+        uitloggen()
 
 # ─── FILTERS TOEPASSEN ───────────────────────────────────────────────────────
 
@@ -232,6 +257,14 @@ if st.session_state.geselecteerd_id:
         st.markdown("#### 📝 Beschrijving")
         st.markdown(w["beschrijving"] if w["beschrijving"] else "_Geen beschrijving_")
 
+        if w["url"]:
+            st.markdown("")
+            st.link_button(
+                "🔗 Bekijk advertentie op 2dehands.be",
+                w["url"],
+                use_container_width=True
+            )
+
     with col_rechts:
         st.markdown("#### 💰 Analyse")
 
@@ -243,7 +276,6 @@ if st.session_state.geselecteerd_id:
         st.metric("Marktwaarde", f"€{marktwaarde:,.0f}")
         kleur_delta = "normal" if afwijking >= 0 else "inverse"
         st.metric(
-
             "Verschil met markt",
             f"€{abs(marktwaarde - prijs):,.0f}",
             delta=f"{afwijking:.1f}%",
