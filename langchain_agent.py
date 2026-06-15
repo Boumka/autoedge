@@ -15,12 +15,24 @@ import scoring
 load_dotenv()
 
 # ─── MODEL ───────────────────────────────────────────────────────────────────
+# Claude als hoofdmodel, Groq als fallback
 
-llm = ChatGroq(
-    api_key=os.getenv("GROQ_API_KEY"),
-    model="llama-3.3-70b-versatile",
-    temperature=0.3,
-)
+ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY")
+
+if ANTHROPIC_KEY:
+    from langchain_anthropic import ChatAnthropic
+    llm = ChatAnthropic(
+        api_key=ANTHROPIC_KEY,
+        model="claude-haiku-4-5-20251001",
+        temperature=0.3,
+        max_tokens=2000,
+    )
+else:
+    llm = ChatGroq(
+        api_key=os.getenv("GROQ_API_KEY"),
+        model="llama-3.3-70b-versatile",
+        temperature=0.3,
+    )
 
 # ─── KENNISBANK DISTRIBUTIE ──────────────────────────────────────────────────
 
