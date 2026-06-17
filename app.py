@@ -10,7 +10,6 @@ import db
 from langchain_chat import toon_langchain_pagina
 from foto_analyse import toon_foto_pagina
 from invoer import toon_invoer_pagina
-from ai_chat import toon_ai_pagina
 from login import toon_login_pagina, check_sessie, uitloggen, check_url_token
 
 # ─── PAGINA-INSTELLINGEN ─────────────────────────────────────────────────────
@@ -111,7 +110,6 @@ st.markdown(f'<div style="margin-bottom:1rem">{svg}</div>', unsafe_allow_html=Tr
 pagina = st.sidebar.radio("Navigatie", [
     "🏠 Dashboard",
     "➕ Invoer",
-    "🤖 AI Assistent",
     "📸 Foto-analyse",
     "🧠 AI Advisor"
 ])
@@ -120,9 +118,7 @@ if pagina == "➕ Invoer":
     toon_invoer_pagina()
     st.stop()
 
-if pagina == "🤖 AI Assistent":
-    toon_ai_pagina()
-    st.stop()
+
 
 if pagina == "📸 Foto-analyse":
     toon_foto_pagina()
