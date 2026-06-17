@@ -1,0 +1,102 @@
+name: AutoEdge Scraper & Herberekening
+
+on:
+  schedule:
+    # Scraper elke 6 uur
+    - cron: '0 */6 * * *'
+    # Marktprijzen & herberekening elke nacht om 02:00 UTC
+    - cron: '0 2 * * *'
+    # Cleanup elke nacht om 03:00 UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:  # Manueel starten via GitHub UI
+
+jobs:
+  scraper:
+    name: Scraper uitvoeren
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Code ophalen
+        uses: actions/checkout@v4
+
+      - name: Python installeren
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Dependencies installeren
+        run: |
+          pip install psycopg2-binary python-dotenv httpx schedule
+
+      - name: .env aanmaken
+        run: |
+          cat > .env << ENVEOF
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          ENVEOF
+
+      - name: Scraper uitvoeren
+        run: python scraper.py
+
+      - name: Marktprijzen herberekenen
+        run: python marktprijzen.py
+
+      - name: Scores herberekenen
+        run: |
+          python -c "
+          import db, scoring
+          from concurrent.futures import ThreadPoolExecutor
+
+          listings = db.fetchall('SELECT l.id, l.merk, l.model, l.bouwjaar, l.km, l.prijs, l.beschrijving FROM listings l WHERE l.actief = TRUE')
+          print(f'{len(listings)} listings herberekenen...')
+
+          def herbereken(l):
+              score = scoring.deal_score({
+                  'merk': l['merk'], 'model': l['model'],
+                  'bouwjaar': l['bouwjaar'], 'km': l['km'],
+                  'prijs': float(l['prijs']),
+                  'beschrijving': l['beschrijving'] or '',
+                  'dagen_online': 7
+              })
+              scoring.sla_score_op(str(l['id']), score)
+
+          with ThreadPoolExecutor(max_workers=5) as ex:
+              ex.map(herbereken, listings)
+          print('Klaar!')
+          "
+
+  cleanup:
+    name: Database cleanup
+    runs-on: ubuntu-latest
+    if: github.event.schedule == '0 3 * * *'
+
+    steps:
+      - name: Code ophalen
+        uses: actions/checkout@v4
+
+      - name: Python installeren
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Dependencies installeren
+        run: pip install psycopg2-binary python-dotenv
+
+      - name: .env aanmaken
+        run: |
+          cat > .env << ENVEOF
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_PORT=${{ secrets.DB_PORT }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          ENVEOF
+
+      - name: Cleanup uitvoeren
+        run: python cleanup.py
