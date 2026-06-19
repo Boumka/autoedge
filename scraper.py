@@ -254,7 +254,9 @@ def sla_listing_op(data: dict) -> str | None:
             %s, %s, %s, %s, %s, %s,
             NOW()
         )
-        ON CONFLICT (source, external_id) DO NOTHING
+        ON CONFLICT (source, external_id) DO UPDATE SET
+         url = EXCLUDED.url,
+         foto_urls = EXCLUDED.foto_urls
         RETURNING id
     """, (
         data["external_id"],
