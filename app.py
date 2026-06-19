@@ -118,8 +118,6 @@ if pagina == "➕ Invoer":
     toon_invoer_pagina()
     st.stop()
 
-
-
 if pagina == "📸 Foto-analyse":
     toon_foto_pagina()
     st.stop()
@@ -295,6 +293,27 @@ if st.session_state.geselecteerd_id:
         for (label, waarde), maximum in zip(score_data.items(), maxima):
             st.markdown(f"**{label}**: {waarde}/{maximum}")
             st.progress(waarde / maximum)
+
+        with st.expander("ℹ️ Hoe wordt de score berekend?"):
+            st.markdown("""
+            **Prijs (max 40 punten)** — Hoe ver de vraagprijs onder of boven de marktwaarde ligt.
+            Lagere prijs dan de markt = hogere score.
+
+            **Km-stand (max 25 punten)** — Vergelijking met het verwachte aantal km voor de leeftijd
+            van de wagen (15.000 km/jaar als referentie). Minder km dan verwacht = hogere score.
+
+            **Staat (max 20 punten)** — Analyse van de beschrijving op positieve signalen
+            (onderhouden, carpass, dealer) en negatieve signalen (schade, defect).
+
+            **Urgentie (max 15 punten)** — Hoe lang de advertentie al online staat.
+            Recent geplaatste advertenties scoren hoger.
+
+            **Totaalscore:**
+            - 75-100: Uitstekende deal
+            - 55-74: Goede deal
+            - 35-54: Marktconform
+            - 0-34: Opgepast
+            """)
 
         st.markdown("#### 🚩 Risicovlaggen")
         vlaggen = w["risico_vlaggen"] if w["risico_vlaggen"] else []
