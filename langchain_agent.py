@@ -5,12 +5,14 @@ Gebruikt de nieuwe LangChain 1.x aanpak zonder AgentExecutor.
 """
 
 import os
+import re
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain.tools import tool
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 import db
 import scoring
+from link_analyse import is_2dehands_link, analyseer_link
 
 load_dotenv()
 
@@ -202,6 +204,28 @@ def get_markt_stats():
             f"Goede deals: {stats['goede_deals']}")
 
 
+def verwerk_link_resultaat(resultaat: dict) -> str:
+    """Zet het resultaat van analyseer_link() om naar leesbare tekst voor de AI."""
+    if not resultaat.get("succes"):
+        return f"Linkanalyse mislukt: {resultaat.get('fout', 'onbekende fout')}"
+
+    herkomst = "(al eerder geanalyseerd)" if resultaat.get("uit_cache") else "(nieuw opgehaald)"
+
+    tekst = (
+        f"Linkanalyse resultaat {herkomst}:\n"
+        f"Wagen: {resultaat['merk']} {resultaat['model']} ({resultaat['bouwjaar']})\n"
+        f"Prijs: €{resultaat['prijs']:,.0f}\n"
+        f"Km-stand: {int(resultaat['km']):,} km\n"
+        f"Deal-score: {resultaat['deal_score']}/100\n"
+        f"Marktwaarde: €{resultaat['marktwaarde']:,.0f}\n"
+        f"Afwijking t.o.v. markt: {resultaat['prijs_afwijking_pct']}%\n"
+        f"Winstpotentieel: €{resultaat['winst_potentieel']:,.0f}\n"
+        f"Signalen: {', '.join(resultaat['risico_vlaggen'])}\n"
+        f"Link: {resultaat['url']}"
+    )
+    return tekst
+
+
 # ─── AGENT MET GEHEUGEN ──────────────────────────────────────────────────────
 
 SYSTEEM_PROMPT = """Je bent de AutoEdge AI-assistent — een persoonlijke wagenkoper-adviseur voor de Belgische markt.
@@ -220,6 +244,11 @@ Gedragsregels:
 4. Onthoud wat de gebruiker eerder zei
 5. Wees concreet en praktisch
 
+Als de gebruiker een 2dehands.be link plakt, wordt die AUTOMATISCH geanalyseerd
+voor jij antwoordt — je krijgt het resultaat al meegegeven in de conversatie.
+Gebruik die data om de wagen te bespreken, geef ook distributie-info en model-info
+als die relevant is voor het merk/model uit de link.
+
 Als je een functie wil aanroepen, schrijf dan:
 [TOOL: functienaam(parameters)]
 Ik voer de functie uit en geef het resultaat terug.
@@ -235,7 +264,6 @@ class AutoEdgeAgent:
 
     def _voer_tool_uit(self, tool_call: str) -> str:
         """Voert een tool-aanroep uit op basis van tekst."""
-        import re
         match = re.search(r'\[TOOL:\s*(\w+)\((.*?)\)\]', tool_call, re.DOTALL)
         if not match:
             return ""
@@ -244,7 +272,6 @@ class AutoEdgeAgent:
         args_str = match.group(2)
 
         try:
-            # Simpele argument parsing
             args = {}
             for deel in args_str.split(","):
                 deel = deel.strip()
@@ -279,6 +306,16 @@ class AutoEdgeAgent:
 
     def chat(self, vraag: str) -> str:
         """Stuurt een vraag naar de agent met volledige gesprekshistoriek."""
+
+        # ── STAP 0: link-detectie VOOR de AI iets doet ──
+        # Als er een 2dehands link in het bericht staat, analyseren we die
+        # direct en geven we het resultaat als extra context mee.
+        link_context = ""
+        link = is_2dehands_link(vraag)
+        if link:
+            resultaat = analyseer_link(link)
+            link_context = verwerk_link_resultaat(resultaat)
+
         # Bouw berichten op
         berichten = [SystemMessage(content=SYSTEEM_PROMPT)]
         for msg in self.geschiedenis:
@@ -286,14 +323,19 @@ class AutoEdgeAgent:
                 berichten.append(HumanMessage(content=msg["inhoud"]))
             else:
                 berichten.append(AIMessage(content=msg["inhoud"]))
-        berichten.append(HumanMessage(content=vraag))
+
+        if link_context:
+            vraag_voor_ai = f"{vraag}\n\n[Automatische linkanalyse]\n{link_context}"
+        else:
+            vraag_voor_ai = vraag
+
+        berichten.append(HumanMessage(content=vraag_voor_ai))
 
         # Eerste AI-respons
         respons = self.llm.invoke(berichten)
         antwoord = respons.content
 
-        # Tool-aanroepen uitvoeren
-        import re
+        # Tool-aanroepen uitvoeren (voor andere tools dan link-analyse)
         tool_calls = re.findall(r'\[TOOL:.*?\]', antwoord, re.DOTALL)
 
         if tool_calls:
@@ -317,7 +359,7 @@ class AutoEdgeAgent:
             respons2 = self.llm.invoke(berichten)
             antwoord = respons2.content
 
-        # Geschiedenis bijwerken (laatste 10 berichten)
+        # Geschiedenis bijwerken (laatste 10 berichten) — origineel bericht opslaan
         self.geschiedenis.append({"rol": "gebruiker", "inhoud": vraag})
         self.geschiedenis.append({"rol": "assistent", "inhoud": antwoord})
         if len(self.geschiedenis) > 20:
@@ -345,7 +387,6 @@ if __name__ == "__main__":
     vragen = [
         "Hoi! Wat zijn de beste deals?",
         "Heeft een VW Golf TDI een distributieriem of ketting?",
-        "Analyseer: VW Golf 2018, 95.000 km, €14.500",
     ]
 
     for vraag in vragen:
