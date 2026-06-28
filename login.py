@@ -151,7 +151,7 @@ def toon_login_pagina():
 
                 # Wachtwoord vergeten link
                 st.markdown("")
-                if st.button("Wachtwoord vergeten?", type="tertiary"):
+                if if st.button("Wachtwoord vergeten?"):
                     st.session_state["reset_modus"] = True
                     st.rerun()
 
